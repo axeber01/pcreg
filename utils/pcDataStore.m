@@ -75,11 +75,14 @@ classdef pcDataStore < matlab.io.Datastore
         currData = zeros(this.nPoints, this.nClouds, 3);
         currLabels = zeros(6, this.nClouds - 1);
         [pointDataOrig,info(idx)] = read(this.FileDatastore);
+        pcOrig = pointCloud(pointDataOrig);
+        % Remove ground plane and ego-vehicle
+        pcProcessed = helperProcessPointCloud(pcOrig);
 %         sample = randsample(length(pointData), this.nPoints);
 %         pointData = pointData(sample, :);
         for n = 1:this.nClouds
-          sample = randsample(length(pointDataOrig), this.nPoints);
-          pointData = pointDataOrig(sample, :);
+          sample = randsample(length(pcProcessed.Location), this.nPoints);
+          pointData = pcProcessed.Location(sample, :);
           if n > 1
             % Sample random rotation and translation
             angles = this.Rstd * randn(1, 3);

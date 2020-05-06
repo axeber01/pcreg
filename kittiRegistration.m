@@ -63,7 +63,7 @@ numOutputs = 6;
 
 %% Training options
 
-numEpochs = 40;
+numEpochs = 20;
 learnRate = 0.001;
 l2Regularization = 0.0001;
 learnRateDropPeriod = 15;
