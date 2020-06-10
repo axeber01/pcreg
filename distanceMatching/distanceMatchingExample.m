@@ -6,6 +6,10 @@ rng(0);
 sigma = 0.01;
 downsamplePercentage = 0.05;
 overlap = 0.5;
+dThresh = 0.1;
+dPerc = 0.1;
+
+fractionOutliers = 0.1;
 
 %% Load the teapot example
 
@@ -22,6 +26,16 @@ P1(P1(:, 2) > 1, :) = [];
 P2(P2(:, 2) < -1, :) = [];
 
 P1(length(P2)+1:end, :) = [];
+
+%% Add outliers
+
+Noutliers = fractionOutliers * length(P1);
+a = 4 * max(max(abs(P1 - mean(P1))));
+O1 = a * (rand(Noutliers, 3) - 0.5) + mean(P1);
+O2 = a * (rand(Noutliers, 3) - 0.5) + mean(P2);
+
+P1 = [P1; O1];
+P2 = [P2; O2];
 
 %%
 
@@ -76,9 +90,16 @@ D2 = o * z2' + z2 * o' - 2 * X2m * X2m';
 [D1sort, i1] = sort(D1);
 [D2sort, i2] = sort(D2);
 
+D1sort(D1sort > dThresh) = 0;
+D2sort(D2sort > dThresh) = 0;
+
+% D1sort = D1sort(1:nDist, :);
+% D2sort = D2sort(1:nDist, :);
+
 %% Find matches
 
 matches = zeros(nPoints, 1);
+errs = zeros(nPoints, 1);
 for n = 1:nPoints
   err = inf;
   for m = 1:nPoints
@@ -86,28 +107,36 @@ for n = 1:nPoints
     if currErr < err
       matches(n) = m;
       err = currErr;
+      errs(n) = err;
     end
   end
 end
       
+%% Prune the matches
+errs(errs < 1e-5) = [];
+goodMatches = errs < quantile(errs, dPerc);
+matches = matches(goodMatches);
     
 %% Calculate number of errors
 
 gt = 1:nPoints;
-nErrs = sum(gt ~= permi(matches));
-frac = nErrs / nPoints;
+nErrs = sum(gt(goodMatches) ~= permi(matches));
+frac = nErrs / length(matches);
 
 disp(['Number of incorrect matches: ', num2str(nErrs)]);
 disp(['Fraction of incorrect matches: ', num2str(frac)]);
 
 %% Register the point clouds using closed form solution to orthogonal proscrustes problem
+X1matched = X1m(goodMatches, :);
 X2matched = X2m(matches, :);
 
-M = X1m' * X2matched;
+M = X1matched' * X2matched;
 [U, ~, V] = svd(M);
 S = eye(3, 3);
 S(3, 3) = sign(det(U * V'));
 Rhat = U * S * V';
+mu1 = mean(X1(goodMatches, :));
+mu2 = mean(X2(matches, :));
 that = mu2 - (Rhat' * mu1')';
 
 disp('Ground truth transformation: ');
@@ -126,6 +155,9 @@ hold on
 pcshow(phat)
 title('Registered point clouds using distance matching');
 
+plot3(X1(goodMatches, 1), X1(goodMatches, 2), X1(goodMatches, 3), 'r.')
+view(2)
+
 %% Compare with ICP
 
 tform = pcregrigid(pointCloud(X2), pointCloud(X1), 'Extrapolate', true);
@@ -139,3 +171,4 @@ pcshow(pointCloud(X1));
 hold on
 pcshow(pctransform(pointCloud(X2), tform))
 title('Registered point clouds using ICP');
+view(2)
